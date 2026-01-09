@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Generate ESM-2 embeddings.
 """
@@ -21,7 +22,7 @@ def main():
     print("ESM-2 Embedding Generation")
     print(f"Processing: {args.input}")
     
-    # Load model (exactly as in slides)
+    # Load model
     print("Loading ESM-2 model...")
     model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
     model.eval()
@@ -42,7 +43,7 @@ def main():
     
     print(f"Found {len(sequences)} proteins")
     
-    # Process each sequence ONE AT A TIME (as in slides)
+    # Process each sequence ONE AT A TIME
     embeddings = []
     
     for i, seq in enumerate(sequences):
@@ -50,23 +51,23 @@ def main():
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1}/{len(sequences)} proteins")
         
-        # TRUNCATION: Exactly as in slides
+        # TRUNCATION
         if len(seq) > 1022:
             seq = seq[:1022]  # Περικοπή για να χωρέσει τα <cls>, <eos>
         
-        # SINGLE sequence processing (exactly as in slides)
+        # SINGLE sequence processing
         data = [("protein", seq)]
         labels, strs, tokens = batch_converter(data)
         
         if torch.cuda.is_available():
             tokens = tokens.cuda()
         
-        # INFERENCE: Exactly as in slides
+        # INFERENCE
         with torch.no_grad():
             results = model(tokens, repr_layers=[6])
             token_embeddings = results["representations"][6]
             
-            # MEAN POOLING: Exactly as in slides
+            # MEAN POOLING
             protein_embedding = token_embeddings.mean(dim=1)
             
             # Convert to numpy
