@@ -10,7 +10,8 @@
 
 #include "../include/lsh.h"
 #include "../include/utils.h"
-#include "../include/data_reader.h"
+
+#include "../include/read_embeddings.h"
 
 
 using namespace std;
@@ -182,60 +183,31 @@ bool lsh_main(const string& data_file,
     
     // Read dataset based on type
     vector<vector<float>> data, queries;
-    if (type == "mnist") {
-        data = read_mnist_im(data_file);
-        queries = read_mnist_im(query_file);
-        // Normalize vectors // by normalizing we get almost perfect results.
-        /*
-        for (auto& vec : data) {
-            float norm = 0.0f;
-            for (float val : vec) norm += val * val;
-            norm = sqrt(norm);
-            if (norm > 1e-12) {
-                for (float& val : vec) val /= norm;
-            }
+
+    data = read_embeddings(data_file);
+    queries = read_embeddings(query_file);
+    if(type == "hello") return true;
+    // Normalize vectors // by normalizing we get almost perfect results.
+    /*
+    for (auto& vec : data) {
+        float norm = 0.0f;
+        for (float val : vec) norm += val * val;
+        norm = sqrt(norm);
+        if (norm > 1e-12) {
+            for (float& val : vec) val /= norm;
         }
-        // Normalize queries
-        for (auto& vec : queries) {
-            float norm = 0.0f;
-            for (float val : vec) norm += val * val;
-            norm = sqrt(norm);
-            if (norm > 1e-12) {
-                for (float& val : vec) val /= norm;
-            }
-        }
-        */
-    } else if (type == "sift") {
-        data = read_sift(data_file);
-        queries = read_sift(query_file);
-        
-        // Limit dataset size if needed
-        if (data.size() > 60000) {
-            data.resize(60000);
-        }
-        
-        // Normalize vectors otherwise we get really bad results.
-        for (auto& vec : data) {
-            float norm = 0.0f;
-            for (float val : vec) norm += val * val;
-            norm = sqrt(norm);
-            if (norm > 1e-12) {
-                for (float& val : vec) val /= norm;
-            }
-        }
-        // Normalize queries
-        for (auto& vec : queries) {
-            float norm = 0.0f;
-            for (float val : vec) norm += val * val;
-            norm = sqrt(norm);
-            if (norm > 1e-12) {
-                for (float& val : vec) val /= norm;
-            }
-        }
-    } else {
-        cerr << "Unknown dataset type: " << type << endl;
-        return false;
     }
+    // Normalize queries
+    for (auto& vec : queries) {
+        float norm = 0.0f;
+        for (float val : vec) norm += val * val;
+        norm = sqrt(norm);
+        if (norm > 1e-12) {
+            for (float& val : vec) val /= norm;
+        }
+    }
+    */
+
 
     if (data.empty() || queries.empty()) {
         cerr << "Failed to read dataset or queries" << endl;

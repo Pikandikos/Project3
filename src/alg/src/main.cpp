@@ -5,7 +5,8 @@
 #include <cstring>
 #include <cstdlib>
 
-#include "../include/data_reader.h"
+#include "../include/read_embeddings.h"
+
 #include "../include/lsh.h"
 #include "../include/hypercube.h"
 #include "../include/kmeans.h"
@@ -109,16 +110,16 @@ int main(int argc, char **argv)
         // -------------- Load dataset --------------
         cout << "Launching Hypercube..." << endl;
         vector<vector<float>> data, queries;
-        data = read_mnist_im(data_file);
-        queries = read_mnist_im(query_file);
+        data = read_embeddings(data_file);
+        queries = read_embeddings(query_file);
         success = hypercube_main(data, queries, output_file, kproj, w, M, probes, N, R, type, rangeSearch, seed);
         cout << (success ? "Hypercube exited successfully\n" : "Hypercube exited abruptly\n");
     }
     else if (use_ivfflat)
     {
         vector<vector<float>> data, queries;
-        data = read_mnist_im(data_file);
-        queries = read_mnist_im(query_file);
+        data = read_embeddings(data_file);
+        queries = read_embeddings(query_file);
 
         cout << "Launching IVFFLAT..." << endl;
         success = ivfflat_main(data, queries, output_file, kclusters, nprobe, N, R, type, rangeSearch, seed);
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
     else if (find_k)
     {
 
-        vector<vector<float>> data = read_mnist_im(data_file);
+        vector<vector<float>> data = read_embeddings(data_file);
         data.resize(10000);
         KMeans kmeanss;
         kmeanss.find_optimal_k(data, 20, 50, 2);

@@ -8,7 +8,8 @@
 #include "../include/ivfpq.h"
 #include "../include/utils.h"
 #include "../include/kmeans.h"
-#include "../include/data_reader.h"
+
+#include "../include/read_embeddings.h"
 
 using namespace std;
 
@@ -255,11 +256,11 @@ bool ivfpq_main(const string& data_file,const string& query_file,const string& o
     // Read dataset based on type
     vector<vector<float>> data, queries;
     if (type == "mnist") {
-        data = read_mnist_im(data_file);
-        queries = read_mnist_im(query_file);
+        data = read_embeddings(data_file);
+        queries = read_embeddings(query_file);
     } else if (type == "sift") {
-        data = read_sift(data_file);
-        queries = read_sift(query_file);
+        //data = read_sift(data_file);
+        //queries = read_sift(query_file);
     } else {
         cerr << "Unknown dataset type: " << type << endl;
         return false;

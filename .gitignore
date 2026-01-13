@@ -1,10 +1,11 @@
 __pycache__/
 venv/
+vscode/
+blast_db/
 *.npy
 *.tsv
 *.csv
 .env
 *.dat
-vscode/
 settings.json
-.txt
+*.txt
