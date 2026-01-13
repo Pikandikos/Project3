@@ -10,5 +10,5 @@ blast_db/
 *.txt
 *.o
 *.d
-
+.venv/
 settings.json
