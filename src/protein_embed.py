@@ -41,9 +41,12 @@ def main():
     sequences = []
     protein_ids = []
     
+    count = 0
     for record in SeqIO.parse(args.input, "fasta"):
         protein_ids.append(record.id)
         sequences.append(str(record.seq))
+        if(count == 10000):  break
+        count+= 1
     
     print(f"Found {len(sequences)} proteins")
     

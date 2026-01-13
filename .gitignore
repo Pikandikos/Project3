@@ -1,9 +1,10 @@
 __pycache__/
+venv/
 *.npy
 *.tsv
 *.csv
 .env
 *.dat
-.venv/
 vscode/
 settings.json
+.txt
