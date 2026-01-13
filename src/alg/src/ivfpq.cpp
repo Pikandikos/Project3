@@ -255,16 +255,11 @@ bool ivfpq_main(const string& data_file,const string& query_file,const string& o
     
     // Read dataset based on type
     vector<vector<float>> data, queries;
-    if (type == "mnist") {
-        data = read_embeddings(data_file);
-        queries = read_embeddings(query_file);
-    } else if (type == "sift") {
-        //data = read_sift(data_file);
-        //queries = read_sift(query_file);
-    } else {
-        cerr << "Unknown dataset type: " << type << endl;
-        return false;
-    }
+
+    if(type == "hello") return 0;
+
+    data = read_embeddings(data_file);
+    queries = read_embeddings(query_file);
 
     if (data.empty() || queries.empty()) {
         cerr << "Failed to read dataset or queries" << endl;
