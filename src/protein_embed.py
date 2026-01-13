@@ -31,6 +31,10 @@ def main():
         model = model.cuda()
         print("Using GPU")
     
+    # device = torch.device("cpu")
+    # model = model.to(device)
+    # print("Using CPU")
+
     batch_converter = alphabet.get_batch_converter()
     
     # Read sequences
@@ -61,6 +65,8 @@ def main():
         
         if torch.cuda.is_available():
             tokens = tokens.cuda()
+        # tokens = tokens.to(device)
+
         
         # INFERENCE
         with torch.no_grad():
