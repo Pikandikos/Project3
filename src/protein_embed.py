@@ -41,12 +41,12 @@ def main():
     sequences = []
     protein_ids = []
     
-    count = 0
+    #count = 0
     for record in SeqIO.parse(args.input, "fasta"):
         protein_ids.append(record.id)
         sequences.append(str(record.seq))
-        if(count == 10000):  break
-        count+= 1
+        #if(count == 10000):  break
+        #count+= 1
     
     print(f"Found {len(sequences)} proteins")
     
@@ -55,7 +55,7 @@ def main():
     
     for i, seq in enumerate(sequences):
         # Progress update
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 10000 == 0:
             print(f"Processed {i + 1}/{len(sequences)} proteins")
         
         # TRUNCATION
