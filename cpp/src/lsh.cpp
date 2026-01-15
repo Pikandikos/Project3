@@ -184,8 +184,8 @@ bool lsh_main(const string& data_file,
     // Read dataset based on type
     vector<vector<float>> data, queries;
 
-    data = read_embeddings(data_file);
-    queries = read_embeddings(query_file);
+    data = read_fvecs(data_file);
+    queries = read_fvecs(query_file);
     if(type == "hello") return true;
     // Normalize vectors // by normalizing we get almost perfect results.
     /*

@@ -216,9 +216,6 @@ def main():
         else:
             methods = [args.method]
 
-
-        DATA_TYPE = "sift" 
-
         def out_file_for(m: str) -> str:
             # Per-method output file produced by C++ program
             return str(out_dir / f"{m}_out.txt")
@@ -230,7 +227,6 @@ def main():
             "-d", db_fvecs,
             "-q", q_fvecs,
             "-o", out_file_for("lsh"),
-            "-type", DATA_TYPE,
             "-lsh",
             "-k", str(args.lsh_k),
             "-L", str(args.lsh_L),
@@ -245,7 +241,6 @@ def main():
             "-d", db_fvecs,
             "-q", q_fvecs,
             "-o", out_file_for("hypercube"),
-            "-type", DATA_TYPE,
             "-hypercube",
             "-kproj", str(args.hc_k),
             "-M", str(args.hc_M),
@@ -261,7 +256,6 @@ def main():
             "-d", db_fvecs,
             "-q", q_fvecs,
             "-o", out_file_for("ivfflat"),
-            "-type", DATA_TYPE,
             "-ivfflat",
             "-kclusters", str(args.ivf_k),
             "-nprobe", str(args.ivf_nprobe),
@@ -275,7 +269,6 @@ def main():
             "-d", db_fvecs,
             "-q", q_fvecs,
             "-o", out_file_for("ivfpq"),
-            "-type", DATA_TYPE,
             "-ivfpq",
             "-kclusters", str(args.ivf_k),
             "-nprobe", str(args.ivf_nprobe),
@@ -332,7 +325,6 @@ def main():
                 f.write(f"  {name}: {path}\n")
 
             f.write("\nNotes:\n")
-            f.write("- Edit CMD_TEMPLATES flags to match your C++ main.cpp.\n")
             f.write("- Neural LSH is intentionally left as TODO.\n")
 
         print(f"Done. Wrote: {args.out}")

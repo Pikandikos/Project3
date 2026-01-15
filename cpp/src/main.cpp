@@ -17,7 +17,7 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-    string data_file = "", query_file = "", type = "mnist", output_file = "output.txt";
+    string data_file = "", query_file = "", type = "", output_file = "output.txt";
 
     // Initialize all parameters with defaults from exercise
     int k = 4, L = 5, N = 1, seed = 1;
@@ -110,16 +110,16 @@ int main(int argc, char **argv)
         // -------------- Load dataset --------------
         cout << "Launching Hypercube..." << endl;
         vector<vector<float>> data, queries;
-        data = read_embeddings(data_file);
-        queries = read_embeddings(query_file);
+        data = read_fvecs(data_file);
+        queries = read_fvecs(query_file);
         success = hypercube_main(data, queries, output_file, kproj, w, M, probes, N, R, type, rangeSearch, seed);
         cout << (success ? "Hypercube exited successfully\n" : "Hypercube exited abruptly\n");
     }
     else if (use_ivfflat)
     {
         vector<vector<float>> data, queries;
-        data = read_embeddings(data_file);
-        queries = read_embeddings(query_file);
+        data = read_fvecs(data_file);
+        queries = read_fvecs(query_file);
 
         cout << "Launching IVFFLAT..." << endl;
         success = ivfflat_main(data, queries, output_file, kclusters, nprobe, N, R, type, rangeSearch, seed);
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
     else if (find_k)
     {
 
-        vector<vector<float>> data = read_embeddings(data_file);
+        vector<vector<float>> data = read_fvecs(data_file);
         data.resize(10000);
         KMeans kmeanss;
         kmeanss.find_optimal_k(data, 20, 50, 2);

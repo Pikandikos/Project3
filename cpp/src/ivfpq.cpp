@@ -258,8 +258,8 @@ bool ivfpq_main(const string& data_file,const string& query_file,const string& o
 
     if(type == "hello") return 0;
 
-    data = read_embeddings(data_file);
-    queries = read_embeddings(query_file);
+    data = read_fvecs(data_file);
+    queries = read_fvecs(query_file);
 
     if (data.empty() || queries.empty()) {
         cerr << "Failed to read dataset or queries" << endl;
