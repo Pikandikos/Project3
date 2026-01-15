@@ -11,14 +11,6 @@ from Bio import SeqIO
 import numpy as np
 
 
-def read_fasta(path: str) -> List[Tuple[str, str]]:
-    # Read FASTA and return (id, sequence) pairs
-    out = []
-    for rec in SeqIO.parse(path, "fasta"):
-        out.append((rec.id, str(rec.seq)))
-    return out
-
-
 def embed_queries_esm2(fasta_path: str) -> Tuple[np.ndarray, List[str]]:
     # Load small ESM-2 model (t6, 8M params) and use last layer (6)
     model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
