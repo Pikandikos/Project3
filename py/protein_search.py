@@ -12,17 +12,58 @@ from collections import defaultdict
 # from nlsh_search import nlsh_search
 
 import numpy as np
-import struct
 
 
-def run_cmd(cmd):
-    # Run external command (C++ backend, BLAST, etc.)
-    subprocess.run(cmd, check=True)
+def embed_queries_esm2(fasta_path: str) -> Tuple[np.ndarray, List[str]]:
+    # Load small ESM-2 model (t6, 8M params) and use last layer (6)
+    model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
+    model.eval()
 
+    # Prefer GPU if available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
 
-def load_ids(path):
-    # Load one ID per line
-    with open(path, "r", encoding="utf-8") as f:
+    # Converts (label, seq) pairs into tokens the model expects
+    batch_converter = alphabet.get_batch_converter()
+
+    # Collect query ids and raw sequences
+    ids: List[str] = []
+    seqs: List[str] = []
+    for rec in SeqIO.parse(fasta_path, "fasta"):
+        ids.append(rec.id)
+        seqs.append(str(rec.seq))
+
+    embs: List[np.ndarray] = []
+
+    # No gradients needed for inference
+    with torch.no_grad():
+        # NOTE: This loops 1-by-1 (simple but slower than batching)
+        for seq in seqs:
+            # ESM-2 token limit ~1024; truncate to fit (<cls> and <eos> take space)
+            if len(seq) > 1022:
+                seq = seq[:1022]
+
+            # Create a single-item batch
+            data = [("q", seq)]
+            _, _, tokens = batch_converter(data)
+            tokens = tokens.to(device)
+
+            # Extract representations from layer 6
+            results = model(tokens, repr_layers=[6])
+            token_embeddings = results["representations"][6]  # shape: (1, L, 320)
+
+            # Mean pooling across the sequence length dimension
+            emb = token_embeddings.mean(dim=1)[0].detach().cpu().numpy().astype(np.float32)
+            embs.append(emb)
+
+    # Stack into (Q, d)
+    Q = np.stack(embs, axis=0)
+    return Q, ids
+
+#Load Dbs
+def load_ids(ids_path: str) -> List[str]:
+    # Load one ID per line (strip empty lines)
+    with open(ids_path, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
 
