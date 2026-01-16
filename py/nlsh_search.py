@@ -9,57 +9,9 @@ from data_reader import load_dataset
 
 from model import MLP
 
-
-# quick argument parser
-def parse_args():
-    p = argparse.ArgumentParser(description="Neural LSH search")
-    
-    # Get all values from command line
-    p.add_argument("-d", required=True)
-    p.add_argument("-q", required=True)
-    p.add_argument("-i", required=True)
-    p.add_argument("-o", required=True)
-    p.add_argument("-type", required=True, choices=["sift", "mnist"])
-
-    p.add_argument("-N", type=int, default=1)
-    p.add_argument("-R", type=float, default=None)
-    p.add_argument("-T", type=int, default=5)
-    p.add_argument("-range", type=str, default="true", choices=["true", "false"])
-    
-    p.add_argument("--batch_size", type=int, default=128)
-    p.add_argument("--seed", type=int, default=1)
-    
-    # Parse arguments for validation
-    args = p.parse_args()
-    check = 0
-    if args.N <= 0:
-        print(f" N must be positive, got {args.N}")
-        check = 1
-    if args.R is not None and args.R <= 0:
-        print(f" R must be positive if provided, got {args.R}")
-        check = 1
-    if args.T <= 0:
-        print(f" T must be positive, got {args.T}")
-        check = 1
-    if args.batch_size <= 0:
-        print(f" batch_size must be positive, got {args.batch_size}")
-        check = 1
-    if check == 1:
-        exit(1)
-
-    return args
-
 # Euclidean distances between query and candidates
 def euclid_dist(query, candidates):
     return np.linalg.norm(candidates - query, axis=1)
-
-# brute force through the dataset to find exact distances
-def brute_force(query, dataset, N):
-    dists = euclid_dist(query, dataset)
-    # Get N nearest neighbors
-    idx = np.argsort(dists)[:N]
-    nearest_dists = dists[idx]
-    return idx, nearest_dists
 
 # Search for a single query using Neural LSH.
 def search_query(query, model, dataset, inv_lists, T, N, R=None):
@@ -108,130 +60,40 @@ def search_query(query, model, dataset, inv_lists, T, N, R=None):
     
     return approx_idx, approx_dist, id_in_range
 
-def main():
-    args = parse_args()
-    
-    # Set random seeds
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    
-    # Set range default based on dataset type
-    if args.R is None:
-        if args.type == "mnist":
-            args.R = 2000.0
-        else:
-            args.R = 2800.0
-    
-    # Load datasets
-    print(f"Loading dataset from {args.d}")
-    dataset = load_dataset(args.d, args.type)
-    print(f"Loading queries from {args.q}")
-    queries = load_dataset(args.q, args.type)
-    
-    # Load model and index
-    model_path = args.i + "_model.pth"
-    index_path = args.i + "_index.pkl"
-    
-    print(f"Loading model from {model_path}")
+def write_tsv(out_path, results):
+    # results: dict[query_idx] -> list[(neighbor_idx, l2)]
+    with open(out_path, "w", encoding="utf-8") as f:
+        for q_idx, neighs in results.items():
+            for r, (n_idx, dist) in enumerate(neighs, start=1):
+                f.write(f"{q_idx}\t{r}\t{n_idx}\t{dist:.6f}\n")
+
+
+def nlsh_search(dataset_npy, queries_npy, index_prefix, out_tsv, N, T, seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    dataset = np.load(dataset_npy).astype(np.float32, copy=False)
+    queries = np.load(queries_npy).astype(np.float32, copy=False)
+
+    model_path = index_prefix + "_model.pth"
+    index_path = index_prefix + "_index.pkl"
 
     model = torch.load(model_path, weights_only=False)
-    
-    print(f"Loading index from {index_path}")
-    with open(index_path, "rb") as f:
-        loaded_idx = pickle.load(f)
-    
-    # pass file contect into variables
-    inv_lists = loaded_idx["inv_lists"]
-    m = loaded_idx["m"]
-    
-    # Prepare output
-    output_lines = ["Neural LSH"]
-    
-    # Metrics
-    total_approx_time = 0
-    total_exact_time = 0
-    total_recall = 0
-    total_af = 0
-    total_queries = 0
-    
-    # Process each query
-    for query_idx, query in enumerate(queries):
-        output_lines.append(f"Query: {query_idx}")
-        
-        # Exact search
-        exact_start = time.time()
-        true_nearest_indices, true_nearest_distances= brute_force(query, dataset, N=args.N)
-        exact_end = time.time()
-        exact_time = exact_end - exact_start
-        
-        # Approximate search with the model(Neural LSH)
-        approx_start = time.time()
-        cand, approx_distances, approx_in_range = search_query(
-            query, model, dataset, inv_lists, 
-            T=args.T, N=args.N, 
-            R=args.R if args.range == "true" else None)
-        approx_end = time.time()
-        approx_time = approx_end - approx_start
-        
-        # Output approximate results
-        for i, (idx, dist) in enumerate(zip(cand[:args.N], approx_distances[:args.N])):
-            if i < len(true_nearest_indices):
-                true_dist = true_nearest_distances[i]
-                output_lines.append(f"Nearest neighbor-{i+1}: {idx}")
-                output_lines.append(f"distanceApproximate: {dist:.6f}")
-                output_lines.append(f"distanceTrue: {true_dist:.6f}")
-                
-                # Compute approximation factor (avoid division by zero)
-                if true_dist > 1e-10:
-                    af = dist / true_dist
-                else:
-                    af = 1.0
-                total_af += af
-            else:
-                output_lines.append(f"Nearest neighbor-{i+1}: {idx}")
-                output_lines.append(f"distanceApproximate: {dist:.6f}")
-                output_lines.append(f"distanceTrue: -")
-        
-        # Output R-near neighbors if range search true
-        if args.range == "true":
-            output_lines.append("R-near neighbors:")
-            for idx in approx_in_range:
-                output_lines.append(str(idx))
-        
-        # Compute recall
-        recall = 0
-        true_set = set(true_nearest_indices[:args.N])
-        approx_set = set(cand[:args.N])
-        recall = len(true_set.intersection(approx_set)) / args.N
-        
-        total_recall += recall
-        total_approx_time += approx_time
-        total_exact_time += exact_time
-        total_queries += 1
-    
-    # Compute final metrics
-    if total_queries > 0:
-        avg_af = total_af / total_queries
-        avg_recall = total_recall / total_queries
-        avg_approx_time = total_approx_time / total_queries
-        avg_exact_time = total_exact_time / total_queries
-        qps = total_queries / total_approx_time if total_approx_time > 0 else 0
-        
-        output_lines.append(f"Average AF: {avg_af:.6f}")
-        output_lines.append(f"Recall@{args.N}: {avg_recall:.6f}")
-        output_lines.append(f"QPS: {qps:.6f}")
-        output_lines.append(f"tApproximateAverage: {avg_approx_time:.6f}")
-        output_lines.append(f"tTrueAverage: {avg_exact_time:.6f}")
-    
+    model.eval()
 
-    # Write output
-    with open(args.o, 'w') as f:
-        f.write("\n".join(output_lines))
-    
-    print(f"Search completed. Results written to {args.o}")
-    print(f"Average Recall@{args.N}: {avg_recall:.4f}")
-    print(f"Average AF: {avg_af:.4f}")
-    print(f"QPS: {qps:.2f}")
+    with open(index_path, "rb") as f:
+        idx = pickle.load(f)
+
+    inv_lists = idx["inv_lists"]
+
+    results = {}
+    for q_idx, q in enumerate(queries):
+        cand, dist, _ = search_query(q, model, dataset, inv_lists, T=T, N=N, R=None)
+        # cand is list of indices, dist is array
+        results[q_idx] = list(zip(cand[:N], dist[:N]))
+
+    write_tsv(out_tsv, results)
+
 
 if __name__ == "__main__":
-    main()
+    pass
