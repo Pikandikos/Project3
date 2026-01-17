@@ -69,8 +69,8 @@ void buildIVFFlat(const vector<vector<float>> &dataset, int k, int seed)
     cout << " - Total data points: " << dataset_global.size() << "\n";
     cout << " - Clusters created: " << k << "\n";
     cout << " - Invalid labels skipped: " << invalidLabels << "\n";
-    for (int j = 0; j < k; ++j)
-        cout << "   Cluster " << j << ": " << invertedLists[j].size() << " points\n";
+    // for (int j = 0; j < k; ++j)
+    //     cout << "   Cluster " << j << ": " << invertedLists[j].size() << " points\n";
 
     cout << "IVFFlat built successfully: " << k << " lists created.\n";
 }

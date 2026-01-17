@@ -4,8 +4,6 @@ import argparse
 import struct
 import subprocess
 import tempfile
-import torch
-import esm
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
@@ -53,11 +51,39 @@ def write_fvecs(path, X):
 def run_cmd(cmd: List[str]) -> None:
     subprocess.run(cmd, check=True)
 
+def load_blast_outfmt6(tsv_path: str, topN: int):
+    # outfmt 6:
+    # qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore
+    hits = defaultdict(list)  # qid -> list[(bitscore, sid, pident)]
 
-def load_json(path):
-    # Load JSON file (BLAST ground truth)
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(tsv_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if len(parts) < 12:
+                continue
+
+            qid = parts[0]
+            sid = parts[1]
+            pident = float(parts[2])
+            bitscore = float(parts[-1])
+
+            hits[qid].append((bitscore, sid, pident))
+
+    blast_top = {}
+    blast_ident = {}
+
+    for qid, rows in hits.items():
+        rows.sort(key=lambda x: x[0], reverse=True)
+        rows = rows[:topN]
+
+        blast_top[qid] = [sid for _, sid, _ in rows]
+        blast_ident[qid] = {sid: pident for _, sid, pident in rows}
+
+    return blast_top, blast_ident
 
 
 def recall_n(ann_ids, blast_set, N):
@@ -92,11 +118,11 @@ def parse_ann_tsv(path, q_ids, db_ids):
     return out
 
 def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blast_pident,
-    evalN, printN):
+    N, printN):
     # Header per query
     f.write(f"\n========================================\n")
     f.write(f"Query: {qid}\n")
-    f.write(f"Eval N (Recall@N): {evalN}\n")
+    f.write(f"Eval N (Recall@N): {N}\n")
     f.write("========================================\n\n")
 
     # Summary table
@@ -111,7 +137,7 @@ def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blas
         qps = q_count / t_total if t_total > 0 else 0.0
 
         ann_ids = [nid for nid, _ in ann_results[m].get(qid, [])]
-        rec = recall_n(ann_ids, blast_top_set, evalN)
+        rec = recall_n(ann_ids, blast_top_set, N)
 
         f.write(f"{m}\t{t_per_q:.6f}\t{qps:.3f}\t{rec:.3f}\n")
 
@@ -148,29 +174,29 @@ def main():
     cpp_exe = "../cpp/bin/search"
 
     # Output
-    ap.add_argument("--report_name", default="report.txt")
+    ap.add_argument("-report_name", default="report.txt")
 
     # Methods
     ap.add_argument(
-        "--method",
+        "-method",
         default="all",
         choices=["all", "lsh", "hypercube", "ivfflat", "ivfpq", "ivf"],
     )
 
     # Evaluation
-    ap.add_argument("--evalN", type=int, default=10)
-    ap.add_argument("--printN", type=int, default=10)
+    ap.add_argument("-printN", type=int, default=10)
 
     # Common ANN params
-    ap.add_argument("--N", type=int, default=10)
+    ap.add_argument("-N", type=int, default=10)
 
 
     args = ap.parse_args()
 
     # Prepare output folders
-    ann_dir = "ann"
+    out_dir = Path("./out").resolve()
+    ann_dir = out_dir / "alg"
     out_dir.mkdir(parents=True, exist_ok=True)
-    ann_dir.mkdir(parents=True, exist_ok=True)
+    # ann_dir.mkdir(parents=True, exist_ok=True)
 
     # Load embeddings
     X_db, db_ids = load_embeddings(args.d, args.d_ids)
@@ -180,11 +206,12 @@ def main():
         raise ValueError("Embedding dimension mismatch between DB and queries")
 
 
-#--------------------------------------------------
-    # Load BLAST ground truth
-    blast_top = load_json(args.blast_topN)
-    blast_ident = load_json(args.blast_identity)
-#--------------------------------------------------
+    # Load BLAST truth from TSV
+    blast_top, blast_ident = load_blast_outfmt6(args.blast, args.N)
+
+    missing = sum(1 for qid in q_ids if qid not in blast_top)
+    if missing:
+        print(f"[WARN] {missing}/{len(q_ids)} queries not found in BLAST TSV (ID mismatch?)")
 
     # Decide which methods to run
     if args.method == "all":
@@ -291,11 +318,7 @@ def main():
             run_cmd(cmd)
             t1 = time.perf_counter()
 
-            timings[m] = {
-                "total_sec": (t1 - t0),
-                "q_count": Q.shape[0],
-            }
-
+            timings[m] = { "total_sec": (t1 - t0), "q_count": Q.shape[0]}
             ann_results[m] = parse_ann_tsv(out_path, q_ids, db_ids)
 
     # Write final report
@@ -305,16 +328,16 @@ def main():
         f.write(f"DB: {args.d}\n")
         f.write(f"Queries: {args.q}\n")
         f.write(f"Methods: {', '.join(methods)}\n")
-        f.write(f"EvalN: {args.evalN}\n")
+        f.write(f"N: {args.N}\n")
         f.write(f"PrintN: {args.printN}\n\n")
 
         for qid in q_ids:
             blast_list = blast_top.get(qid, [])
-            blast_set = set(blast_list[:args.evalN])
+            blast_set = set(blast_list[:args.N])
             pident_map = blast_ident.get(qid, {})
 
             write_query_block(f, qid, methods, ann_results, timings, blast_set, pident_map,
-                args.evalN, args.printN)
+                args.N, args.printN)
 
     print(f"[DONE] Wrote report: {report_path}")
     print(f"[DONE] ANN outputs in: {ann_dir}")

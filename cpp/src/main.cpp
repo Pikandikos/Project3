@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 
     bool use_lsh = false, use_hypercube = false, use_ivfflat = false, use_ivfpq = false;
     bool rangeSearch = false;
-    bool find_k = false;
+    // bool find_k = false;
 
     // Get command line arguments in whatever order they were placed
     for (int i = 1; i < argc; ++i)

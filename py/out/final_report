@@ -1,0 +1,308 @@
+Protein search report
+
+DB: ../results/embeddings.npy
+Queries: ../results/query_vectors.npy
+Methods: lsh, hypercube, ivfflat, ivfpq
+N: 10
+PrintN: 10
+
+
+========================================
+Query: A0A009I3Y5
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009PCK4
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A001
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A002
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009HL96
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009HLV9
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009HN45
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009HQC9
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009HPM0
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A009IB02
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A010Q3W2
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+
+========================================
+Query: A0A010Q8R4
+Eval N (Recall@N): 10
+========================================
+
+Summary (per method)
+Method	Time/query(s)	QPS	Recall@N
+lsh	0.094581	10.573	0.000
+hypercube	0.080140	12.478	0.000
+ivfflat	0.532293	1.879	0.000
+ivfpq	12.140043	0.082	0.000
+
+Top-10 neighbors (lsh)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (hypercube)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfflat)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
+Top-10 neighbors (ivfpq)
+NeighborID	L2	BLAST_pident	In_BLAST_TopN	Comment
+
