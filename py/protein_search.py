@@ -14,12 +14,19 @@ from collections import defaultdict
 # from nlsh_build import nlsh_build
 # from nlsh_search import nlsh_search
 
+def norm_id(x: str) -> str:
+    x = x.strip()
+    if "|" in x:
+        parts = x.split("|")
+        if len(parts) >= 2 and parts[1]:
+            return parts[1]
+    return x
+
 #Load Dbs
 def load_ids(ids_path: str) -> list[str]:
     # Load one ID per line (strip empty lines)
     with open(ids_path, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
-
+        return [norm_id(line) for line in f if line.strip()]
 
 def load_embeddings(npy_path, ids_path):
     # Load embeddings and their corresponding IDs
@@ -66,8 +73,9 @@ def load_blast_outfmt6(tsv_path: str, topN: int):
             if len(parts) < 12:
                 continue
 
-            qid = parts[0]
-            sid = parts[1]
+            qid = norm_id(parts[0])
+            sid = norm_id(parts[1])
+
             pident = float(parts[2])
             bitscore = float(parts[-1])
 
@@ -87,10 +95,11 @@ def load_blast_outfmt6(tsv_path: str, topN: int):
 
 
 def recall_n(ann_ids, blast_set, N):
-    # Recall@N = |ANN ∩ BLAST| / N
-    if N <= 0:
+    ann_top = ann_ids[:N]
+    denom = len(ann_top)
+    if denom == 0:
         return 0.0
-    return len(set(ann_ids[:N]) & blast_set) / float(N)
+    return len(set(ann_top) & blast_set) / float(denom)
 
 
 def parse_ann_text(path: str, q_ids: list[str], db_ids: list[str], topN: int):
@@ -123,8 +132,11 @@ def parse_ann_text(path: str, q_ids: list[str], db_ids: list[str], topN: int):
                 dist = float(line.split(":")[1].strip())
                 # map indices -> IDs
                 if 0 <= current_qidx < len(q_ids) and 0 <= last_neighbor_idx < len(db_ids):
-                    qid = q_ids[current_qidx]
-                    nid = db_ids[last_neighbor_idx]
+                    qid = norm_id(q_ids[current_qidx])
+                    nid = norm_id(db_ids[last_neighbor_idx])
+                    print("DB id sample:", db_ids[:5])
+                    print("Query id sample:", q_ids[:5])
+
                     out[qid].append((nid, dist))
 
                     # keep only topN per query (optional safety)
@@ -150,28 +162,46 @@ def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blas
         t_total = timings[m]["total_sec"]
         q_count = timings[m]["q_count"]
 
-        t_per_q = t_total / q_count
+        t_per_q = t_total / q_count if q_count else 0.0
         qps = q_count / t_total if t_total > 0 else 0.0
 
-        ann_ids = [nid for nid, _ in ann_results[m].get(qid, [])]
-        rec = recall_n(ann_ids, blast_top_set, N)
+        rows = ann_results[m].get(qid, [])
 
+        # stable dedup
+        seen = set()
+        uniq = []
+        for nid, l2 in rows:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            uniq.append(nid)
+
+        rec = recall_n(uniq, blast_top_set, N)
         f.write(f"{m}\t{t_per_q:.6f}\t{qps:.3f}\t{rec:.3f}\n")
 
     f.write("\n")
 
-    # Detailed neighbor tables
     for m in methods:
         f.write(f"Top-{printN} neighbors ({m})\n")
-        f.write("NeighborID\tL2\tBLAST_pident\tIn_BLAST_TopN\tComment\n")
+        f.write("Rank\tNeighborID\tL2\tBLAST_pident\tIn_BLAST_TopN\tComment\n")
 
-        rows = ann_results[m].get(qid, [])[:printN]
+        rows = ann_results[m].get(qid, [])
+
+        seen = set()
+        rows_unique = []
         for nid, l2 in rows:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            rows_unique.append((nid, l2))
+
+        for rank, (nid, l2) in enumerate(rows_unique[:printN], start=1):
             pident = blast_pident.get(nid)
             pident_str = f"{pident:.2f}" if pident is not None else "-"
+            if nid not in blast_top_set and nid in set(blast_pident.keys()):
+                f.write(f"# DEBUG: nid has pident but not in top set: {nid}\n")
             in_blast = "Yes" if nid in blast_top_set else "No"
-
-            f.write(f"{nid}\t{l2:.6f}\t{pident_str}\t{in_blast}\t-\n")
+            f.write(f"{rank}\t{nid}\t{l2:.6f}\t{pident_str}\t{in_blast}\t-\n")
 
         f.write("\n")
 
@@ -213,7 +243,7 @@ def main():
     out_dir = Path("./out").resolve()
     ann_dir = out_dir / "alg"
     out_dir.mkdir(parents=True, exist_ok=True)
-    # ann_dir.mkdir(parents=True, exist_ok=True)
+    ann_dir.mkdir(parents=True, exist_ok=True)
 
     # Load embeddings
     X_db, db_ids = load_embeddings(args.d, args.d_ids)
@@ -341,7 +371,12 @@ def main():
             # some_q = q_ids[0]
             # print("Example parsed neighbors:", ann_results[methods[0]].get(some_q, [])[:3])
             # print("Example BLAST hits:", blast_top.get(some_q, [])[:3])
-
+    
+    for qid in list(ann_results.values())[0].keys():
+        print("DEBUG QID:", qid)
+        print(" ANN sample:", ann_results[methods[0]][qid][:3])
+        print(" BLAST top:", blast_top.get(qid, [])[:3])
+        break
 
     # Write final report
     report_path = out_dir / args.report_name
