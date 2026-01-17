@@ -13,14 +13,11 @@ import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate ESM-2 embeddings")
-    parser.add_argument("-i", "--input", required=True, help="Input FASTA file")
-    parser.add_argument("-o", "--output", required=True, help="Output .npy file")
-    
+    # Argument parsing
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output", required=True)
     args = parser.parse_args()
-    
-    print("ESM-2 Embedding Generation")
-    print(f"Processing: {args.input}")
     
     # Load model
     print("Loading ESM-2 model...")
@@ -30,10 +27,7 @@ def main():
     if torch.cuda.is_available():
         model = model.cuda()
         print("Using GPU")
-    
-    # device = torch.device("cpu")
-    # model = model.to(device)
-    # print("Using CPU")
+
 
     batch_converter = alphabet.get_batch_converter()
     
@@ -50,7 +44,7 @@ def main():
     
     print(f"Found {len(sequences)} proteins")
     
-    # Process each sequence ONE AT A TIME
+    # Process each sequence
     embeddings = []
     
     for i, seq in enumerate(sequences):
@@ -60,15 +54,14 @@ def main():
         
         # TRUNCATION
         if len(seq) > 1022:
-            seq = seq[:1022]  # Περικοπή για να χωρέσει τα <cls>, <eos>
+            seq = seq[:1022]
         
-        # SINGLE sequence processing
+        # Single sequence processing
         data = [("protein", seq)]
         labels, strs, tokens = batch_converter(data)
         
         if torch.cuda.is_available():
             tokens = tokens.cuda()
-        # tokens = tokens.to(device)
 
         
         # INFERENCE
@@ -93,7 +86,7 @@ def main():
         for pid in protein_ids:
             f.write(f"{pid}\n")
     
-    print(f"\n Done! Generated {len(embeddings)} embeddings")
+    print(f"\n Generated {len(embeddings)} embeddings")
     print(f"Saved to: {args.output}")
 
 
