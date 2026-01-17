@@ -16,52 +16,6 @@ from collections import defaultdict
 # from nlsh_build import nlsh_build
 # from nlsh_search import nlsh_search
 
-def embed_queries_esm2(fasta_path: str) -> tuple[np.ndarray, list[str]]:
-    # Load small ESM-2 model (t6, 8M params) and use last layer (6)
-    model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
-    model.eval()
-
-    # Prefer GPU if available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
-
-    # Converts (label, seq) pairs into tokens the model expects
-    batch_converter = alphabet.get_batch_converter()
-
-    # Collect query ids and raw sequences
-    ids: list[str] = []
-    seqs: list[str] = []
-    for rec in SeqIO.parse(fasta_path, "fasta"):
-        ids.append(rec.id)
-        seqs.append(str(rec.seq))
-
-    embs: list[np.ndarray] = []
-
-    # No gradients needed for inference
-    with torch.no_grad():
-        # NOTE: This loops 1-by-1 (simple but slower than batching)
-        for seq in seqs:
-            # ESM-2 token limit ~1024; truncate to fit (<cls> and <eos> take space)
-            if len(seq) > 1022:
-                seq = seq[:1022]
-
-            # Create a single-item batch
-            data = [("q", seq)]
-            _, _, tokens = batch_converter(data)
-            tokens = tokens.to(device)
-
-            # Extract representations from layer 6
-            results = model(tokens, repr_layers=[6])
-            token_embeddings = results["representations"][6]  # shape: (1, L, 320)
-
-            # Mean pooling across the sequence length dimension
-            emb = token_embeddings.mean(dim=1)[0].detach().cpu().numpy().astype(np.float32)
-            embs.append(emb)
-
-    # Stack into (Q, d)
-    Q = np.stack(embs, axis=0)
-    return Q, ids
-
 #Load Dbs
 def load_ids(ids_path: str) -> list[str]:
     # Load one ID per line (strip empty lines)
@@ -182,20 +136,18 @@ def main():
     ap = argparse.ArgumentParser()
 
     # Embeddings
-    ap.add_argument("--db_npy", required=True)
-    ap.add_argument("--db_ids", required=True)
-    ap.add_argument("--queries_npy", required=True)
-    ap.add_argument("--queries_ids", required=True)
+    ap.add_argument("-d", required=True)
+    ap.add_argument("-d_ids", required=True)
+    ap.add_argument("-q", required=True)
+    ap.add_argument("-q_ids", required=True)
 
     # BLAST ground truth
-    ap.add_argument("--blast_topN", required=True)
-    ap.add_argument("--blast_identity", required=True)
+    ap.add_argument("-blast", required=True)
 
     # C++ backend
-    ap.add_argument("--cpp_exe", required=True)
+    cpp_exe = "../cpp/bin/search"
 
     # Output
-    ap.add_argument("--out_dir", required=True)
     ap.add_argument("--report_name", default="report.txt")
 
     # Methods
@@ -211,60 +163,28 @@ def main():
 
     # Common ANN params
     ap.add_argument("--N", type=int, default=10)
-    ap.add_argument("--R", type=float, default=0.0)
-    ap.add_argument("--range", action="store_true")
 
-    # LSH params
-    ap.add_argument("--lsh_k", type=int, default=10)
-    ap.add_argument("--lsh_L", type=int, default=20)
-    ap.add_argument("--lsh_w", type=float, default=4.0)
-
-    # Hypercube params
-    ap.add_argument("--hc_k", type=int, default=14)
-    ap.add_argument("--hc_w", type=float, default=4.0)
-    ap.add_argument("--hc_M", type=int, default=1000)
-    ap.add_argument("--hc_probes", type=int, default=10)
-
-    # IVF / PQ params
-    ap.add_argument("--ivf_k", type=int, default=100)
-    ap.add_argument("--ivf_nprobe", type=int, default=8)
-    ap.add_argument("--pq_m", type=int, default=16)
-    ap.add_argument("--pq_nbits", type=int, default=8)
-
-    ap.add_argument("--nlsh_prefix", default=None, help="Prefix for nlsh index files")
-    ap.add_argument("--nlsh_T", type=int, default=5, help="Top-T bins probed")
-    ap.add_argument("--nlsh_build", action="store_true", help="Build nlsh index before searching")
-    ap.add_argument("--nlsh_knn", type=int, default=10)
-    ap.add_argument("--nlsh_m", type=int, default=50)
-    ap.add_argument("--nlsh_layers", type=int, default=2)
-    ap.add_argument("--nlsh_nodes", type=int, default=128)
-    ap.add_argument("--nlsh_epochs", type=int, default=5)
-    ap.add_argument("--nlsh_batch", type=int, default=256)
-    ap.add_argument("--nlsh_lr", type=float, default=1e-3)
-    ap.add_argument("--nlsh_kahip_mode", type=int, default=0)
-    ap.add_argument("--nlsh_imbalance", type=float, default=0.03)
-
-
-    ap.add_argument("--seed", type=int, default=1)
 
     args = ap.parse_args()
 
     # Prepare output folders
-    out_dir = Path(args.out_dir).resolve()
-    ann_dir = out_dir / "ann"
+    ann_dir = "ann"
     out_dir.mkdir(parents=True, exist_ok=True)
     ann_dir.mkdir(parents=True, exist_ok=True)
 
     # Load embeddings
-    X_db, db_ids = load_embeddings(args.db_npy, args.db_ids)
-    Q, q_ids = load_embeddings(args.queries_npy, args.queries_ids)
+    X_db, db_ids = load_embeddings(args.d, args.d_ids)
+    Q, q_ids = load_embeddings(args.q, args.q_ids)
 
     if X_db.shape[1] != Q.shape[1]:
         raise ValueError("Embedding dimension mismatch between DB and queries")
 
+
+#--------------------------------------------------
     # Load BLAST ground truth
     blast_top = load_json(args.blast_topN)
     blast_ident = load_json(args.blast_identity)
+#--------------------------------------------------
 
     # Decide which methods to run
     if args.method == "all":
@@ -294,45 +214,29 @@ def main():
 
             if m == "lsh":
                 cmd = [
-                    args.cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
                     "-o", str(out_path), "-lsh",
-                    "-k", str(args.lsh_k), "-L", str(args.lsh_L),
-                    "-w", str(args.lsh_w),
-                    "-N", str(args.N), "-R", str(args.R),
-                    "--seed", str(args.seed),
-                    "-range", "true" if args.range else "false",
+                    "-N", str(args.N),
                 ]
             elif m == "hypercube":
                 cmd = [
-                    args.cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
                     "-o", str(out_path), "-hypercube",
-                    "-kproj", str(args.hc_k), "-M", str(args.hc_M),
-                    "-probes", str(args.hc_probes), "-w", str(args.hc_w),
-                    "-N", str(args.N), "-R", str(args.R),
-                    "--seed", str(args.seed),
-                    "-range", "true" if args.range else "false",
+                    "-N", str(args.N),
                 ]
             elif m == "ivfflat":
                 cmd = [
-                    args.cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
                     "-o", str(out_path), "-ivfflat",
-                    "-kclusters", str(args.ivf_k),
-                    "-nprobe", str(args.ivf_nprobe),
-                    "-N", str(args.N), "-R", str(args.R),
-                    "--seed", str(args.seed),
-                    "-range", "true" if args.range else "false",
+                    "-N", str(args.N),
                 ]
             elif m == "ivfpq":
                 cmd = [
-                    args.cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
                     "-o", str(out_path), "-ivfpq",
-                    "-kclusters", str(args.ivf_k),
-                    "-nprobe", str(args.ivf_nprobe),
-                    "-M", str(args.pq_m), "-nbits", str(args.pq_nbits),
-                    "-N", str(args.N), "-R", str(args.R),
-                    "--seed", str(args.seed),
-                    "-range", "true" if args.range else "false",
+                    "-N", str(args.N),
                 ]
+
             # elif m == "nlsh":
             #     out_path = ann_dir / "nlsh.tsv"
 
@@ -398,8 +302,8 @@ def main():
     report_path = out_dir / args.report_name
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("Protein search report\n\n")
-        f.write(f"DB: {args.db_npy}\n")
-        f.write(f"Queries: {args.queries_npy}\n")
+        f.write(f"DB: {args.d}\n")
+        f.write(f"Queries: {args.q}\n")
         f.write(f"Methods: {', '.join(methods)}\n")
         f.write(f"EvalN: {args.evalN}\n")
         f.write(f"PrintN: {args.printN}\n\n")
