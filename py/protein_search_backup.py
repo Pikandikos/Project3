@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+
+import argparse
+import struct
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import List, Tuple
+import numpy as np
+import json
+import time
+from collections import defaultdict
+
+# from nlsh_build import nlsh_build
+# from nlsh_search import nlsh_search
+
+def norm_id(x: str) -> str:
+    x = x.strip()
+    if "|" in x:
+        parts = x.split("|")
+        if len(parts) >= 2 and parts[1]:
+            return parts[1]
+    return x
+
+#Load Dbs
+def load_ids(ids_path: str) -> list[str]:
+    # Load one ID per line (strip empty lines)
+    with open(ids_path, "r", encoding="utf-8") as f:
+        return [norm_id(line) for line in f if line.strip()]
+
+def load_embeddings(npy_path, ids_path):
+    # Load embeddings and their corresponding IDs
+    X = np.load(npy_path).astype(np.float32, copy=False)
+    ids = load_ids(ids_path)
+
+    # Basic sanity checks
+    if X.ndim != 2:
+        raise ValueError(f"Embeddings must be 2D (N,d). Got shape={X.shape}.")
+    if len(ids) != X.shape[0]:
+        raise ValueError(f"IDs lines ({len(ids)}) != embedding rows ({X.shape[0]}).")
+
+    return X, ids
+
+
+def write_fvecs(path, X):
+    # Write vectors in fvecs format so the C++ code can read them
+    # Format: [int32 dim][float32 * dim] repeated
+    X = np.asarray(X, dtype=np.float32)
+    n, d = X.shape
+
+    with open(path, "wb") as f:
+        for i in range(n):
+            f.write(struct.pack("<i", d))
+            f.write(X[i].tobytes(order="C"))
+
+
+# Run C++ files/algorithms
+def run_cmd(cmd: List[str]) -> None:
+    subprocess.run(cmd, check=True)
+
+def load_blast_outfmt6(tsv_path: str, topN: int):
+    # outfmt 6:
+    # qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore
+    hits = defaultdict(list)  # qid -> list[(bitscore, sid, pident)]
+
+    with open(tsv_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if len(parts) < 12:
+                continue
+
+            qid = norm_id(parts[0])
+            sid = norm_id(parts[1])
+
+            pident = float(parts[2])
+            bitscore = float(parts[-1])
+
+            hits[qid].append((bitscore, sid, pident))
+
+    blast_top = {}
+    blast_ident = {}
+
+    for qid, rows in hits.items():
+        rows.sort(key=lambda x: x[0], reverse=True)
+        rows = rows[:topN]
+
+        blast_top[qid] = [sid for _, sid, _ in rows]
+        blast_ident[qid] = {sid: pident for _, sid, pident in rows}
+
+    return blast_top, blast_ident
+
+
+def recall_n(ann_ids, blast_set, N):
+    ann_top = ann_ids[:N]
+    denom = len(ann_top)
+    if denom == 0:
+        return 0.0
+    return len(set(ann_top) & blast_set) / float(denom)
+
+
+def parse_ann_text(path: str, q_ids: list[str], db_ids: list[str], topN: int):
+
+    out = defaultdict(list)  # qid -> [(neighbor_id, l2), ...]
+
+    current_qidx = None
+    last_neighbor_idx = None
+
+    with open(path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+
+            if line.startswith("Query:"):
+                current_qidx = int(line.split(":")[1].strip())
+                last_neighbor_idx = None
+                continue
+
+            if line.startswith("Nearest neighbor"):
+                # "Nearest neighbor-3: 15886"
+                last_neighbor_idx = int(line.split(":")[1].strip())
+                continue
+
+            if line.startswith("distanceApproximate:"):
+                if current_qidx is None or last_neighbor_idx is None:
+                    continue
+
+                dist = float(line.split(":")[1].strip())
+                # map indices -> IDs
+                if 0 <= current_qidx < len(q_ids) and 0 <= last_neighbor_idx < len(db_ids):
+                    qid = norm_id(q_ids[current_qidx])
+                    nid = norm_id(db_ids[last_neighbor_idx])
+                    print("DB id sample:", db_ids[:5])
+                    print("Query id sample:", q_ids[:5])
+
+                    out[qid].append((nid, dist))
+
+                    # keep only topN per query (optional safety)
+                    if len(out[qid]) >= topN:
+                        last_neighbor_idx = None
+
+    return out
+
+
+def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blast_pident,
+    N, printN):
+    # Header per query
+    f.write(f"\n========================================\n")
+    f.write(f"Query: {qid}\n")
+    f.write(f"Eval N (Recall@N): {N}\n")
+    f.write("========================================\n\n")
+
+    # Summary table
+    f.write("Summary (per method)\n")
+    f.write("Method\tTime/query(s)\tQPS\tRecall@N\n")
+
+    for m in methods:
+        t_total = timings[m]["total_sec"]
+        q_count = timings[m]["q_count"]
+
+        t_per_q = t_total / q_count if q_count else 0.0
+        qps = q_count / t_total if t_total > 0 else 0.0
+
+        rows = ann_results[m].get(qid, [])
+
+        # stable dedup
+        seen = set()
+        uniq = []
+        for nid, l2 in rows:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            uniq.append(nid)
+
+        rec = recall_n(uniq, blast_top_set, N)
+        f.write(f"{m}\t{t_per_q:.6f}\t{qps:.3f}\t{rec:.3f}\n")
+
+    f.write("\n")
+
+    for m in methods:
+        f.write(f"Top-{printN} neighbors ({m})\n")
+        f.write("Rank\tNeighborID\tL2\tBLAST_pident\tIn_BLAST_TopN\tComment\n")
+
+        rows = ann_results[m].get(qid, [])
+
+        seen = set()
+        rows_unique = []
+        for nid, l2 in rows:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            rows_unique.append((nid, l2))
+
+        for rank, (nid, l2) in enumerate(rows_unique[:printN], start=1):
+            pident = blast_pident.get(nid)
+            pident_str = f"{pident:.2f}" if pident is not None else "-"
+            if nid not in blast_top_set and nid in set(blast_pident.keys()):
+                f.write(f"# DEBUG: nid has pident but not in top set: {nid}\n")
+            in_blast = "Yes" if nid in blast_top_set else "No"
+            f.write(f"{rank}\t{nid}\t{l2:.6f}\t{pident_str}\t{in_blast}\t-\n")
+
+        f.write("\n")
+
+def main():
+    ap = argparse.ArgumentParser()
+
+    # Embeddings
+    ap.add_argument("-d", required=True)
+    ap.add_argument("-d_ids", required=True)
+    ap.add_argument("-q", required=True)
+    ap.add_argument("-q_ids", required=True)
+
+    # BLAST ground truth
+    ap.add_argument("-blast", required=True)
+
+    # C++ backend
+    cpp_exe = "../cpp/bin/search"
+
+    # Output
+    ap.add_argument("-report_name", default="report.txt")
+
+    # Methods
+    ap.add_argument(
+        "-method",
+        default="all",
+        choices=["all", "lsh", "hypercube", "ivfflat", "ivfpq", "ivf"],
+    )
+
+    # Evaluation
+    ap.add_argument("-printN", type=int, default=10)
+
+    # Common ANN params
+    ap.add_argument("-N", type=int, default=10)
+
+
+    args = ap.parse_args()
+
+    # Prepare output folders
+    out_dir = Path("./out").resolve()
+    ann_dir = out_dir / "alg"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ann_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load embeddings
+    X_db, db_ids = load_embeddings(args.d, args.d_ids)
+    Q, q_ids = load_embeddings(args.q, args.q_ids)
+
+    if X_db.shape[1] != Q.shape[1]:
+        raise ValueError("Embedding dimension mismatch between DB and queries")
+
+
+    # Load BLAST truth from TSV
+    blast_top, blast_ident = load_blast_outfmt6(args.blast, args.N)
+
+    missing = sum(1 for qid in q_ids if qid not in blast_top)
+    if missing:
+        print(f"[WARN] {missing}/{len(q_ids)} queries not found in BLAST TSV (ID mismatch?)")
+
+    # Decide which methods to run
+    if args.method == "all":
+        methods = ["lsh", "hypercube", "ivfflat", "ivfpq", 
+                #    "nlsh"
+                   ]
+    elif args.method == "ivf":
+        methods = ["ivfflat", "ivfpq"]
+    else:
+        methods = [args.method]
+
+    # Temporary workspace for fvecs
+    with tempfile.TemporaryDirectory(prefix="protein_search_") as td:
+        td = Path(td)
+        db_fvecs = td / "db.fvecs"
+        q_fvecs = td / "queries.fvecs"
+
+        write_fvecs(db_fvecs, X_db)
+        write_fvecs(q_fvecs, Q)
+
+        timings = {}
+        ann_results = {}
+
+        # Run each ANN method
+        for m in methods:
+            out_path = ann_dir / f"{m}.tsv"
+
+            if m == "lsh":
+                cmd = [
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    "-o", str(out_path), "-lsh",
+                    "-N", str(args.N),
+                ]
+            elif m == "hypercube":
+                cmd = [
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    "-o", str(out_path), "-hypercube",
+                    "-N", str(args.N),
+                ]
+            elif m == "ivfflat":
+                cmd = [
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    "-o", str(out_path), "-ivfflat",
+                    "-N", str(args.N),
+                ]
+            elif m == "ivfpq":
+                cmd = [
+                    cpp_exe, "-d", str(db_fvecs), "-q", str(q_fvecs),
+                    "-o", str(out_path), "-ivfpq",
+                    "-N", str(args.N),
+                ]
+
+            # elif m == "nlsh":
+            #     out_path = ann_dir / "nlsh.tsv"
+
+            #     # choose where nlsh files live
+            #     if args.nlsh_prefix is None:
+            #         nlsh_prefix = str((out_dir / "nlsh" / "index").resolve())
+            #     else:
+            #         nlsh_prefix = args.nlsh_prefix
+
+            #     Path(nlsh_prefix).parent.mkdir(parents=True, exist_ok=True)
+
+            #     if args.nlsh_build:
+            #         t_build0 = time.perf_counter()
+            #         nlsh_build(
+            #             d=args.db_npy,
+            #             i=nlsh_prefix,
+            #             type="protein",
+            #             seed=args.seed,
+            #             knn=args.nlsh_knn,
+            #             m=args.nlsh_m,
+            #             kahip_mode=args.nlsh_kahip_mode,
+            #             imbalance=args.nlsh_imbalance,
+            #             layers=args.nlsh_layers,
+            #             nodes=args.nlsh_nodes,
+            #             epochs=args.nlsh_epochs,
+            #             batch_size=args.nlsh_batch,
+            #             lr=args.nlsh_lr,
+            #         )
+            #         t_build1 = time.perf_counter()
+            #         print(f"[NLSH] build time: {t_build1 - t_build0:.2f}s")
+
+            #         # search (this produces the TSV in the expected format)
+            #         t0 = time.perf_counter()
+            #         nlsh_search(
+            #             dataset_npy=args.db_npy,
+            #             queries_npy=args.queries_npy,
+            #             index_prefix=nlsh_prefix,
+            #             out_tsv=str(out_path),
+            #             N=args.N,
+            #             T=args.nlsh_T,
+            #             seed=args.seed,
+            #         )
+            #         t1 = time.perf_counter()
+
+            #         timings[m] = {"total_sec": (t1 - t0), "q_count": Q.shape[0]}
+            #         ann_results[m] = parse_ann_text(str(out_path), q_ids, db_ids, topN=args.N)
+            #         continue
+            else:
+                raise ValueError(f"Unknown method: {m}")
+
+            t0 = time.perf_counter()
+            run_cmd(cmd)
+            t1 = time.perf_counter()
+
+            timings[m] = { "total_sec": (t1 - t0), "q_count": Q.shape[0]}
+            ann_results[m] = parse_ann_text(str(out_path), q_ids, db_ids, topN=args.N)
+
+            # some_q = q_ids[0]
+            # print("Example parsed neighbors:", ann_results[methods[0]].get(some_q, [])[:3])
+            # print("Example BLAST hits:", blast_top.get(some_q, [])[:3])
+    
+    for qid in list(ann_results.values())[0].keys():
+        print("DEBUG QID:", qid)
+        print(" ANN sample:", ann_results[methods[0]][qid][:3])
+        print(" BLAST top:", blast_top.get(qid, [])[:3])
+        break
+
+    # Write final report
+    report_path = out_dir / args.report_name
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("Protein search report\n\n")
+        f.write(f"DB: {args.d}\n")
+        f.write(f"Queries: {args.q}\n")
+        f.write(f"Methods: {', '.join(methods)}\n")
+        f.write(f"N: {args.N}\n")
+        f.write(f"PrintN: {args.printN}\n\n")
+
+        for qid in q_ids:
+            blast_list = blast_top.get(qid, [])
+            blast_set = set(blast_list[:args.N])
+            pident_map = blast_ident.get(qid, {})
+
+            write_query_block(f, qid, methods, ann_results, timings, blast_set, pident_map,
+                args.N, args.printN)
+
+    print(f"[DONE] Wrote report: {report_path}")
+    print(f"[DONE] ANN outputs in: {ann_dir}")
+
+
+if __name__ == "__main__":
+    main()

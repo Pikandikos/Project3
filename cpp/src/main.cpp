@@ -20,11 +20,11 @@ int main(int argc, char **argv)
     string data_file = "", query_file = "", type = "", output_file = "output.txt";
 
     // Initialize all parameters with defaults from exercise
-    int k = 4, L = 5, N = 1, seed = 1;
-    double w = 4.0, R = 2.0;
+    int k = 10, L = 25, N = 1, seed = 1;
+    double w = 40.0, R = 2.0;
 
     // hypercube / ivf specific
-    int kproj = 14, M = 10, probes = 2, kclusters = 50, nprobe = 5, nbits = 8;
+    int kproj = 28, M = 20, probes = 4, kclusters = 50, nprobe = 6, nbits = 8;
 
     bool use_lsh = false, use_hypercube = false, use_ivfflat = false, use_ivfpq = false;
     bool rangeSearch = false;
