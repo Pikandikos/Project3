@@ -21,7 +21,7 @@ int main(int argc, char **argv)
 
     // Initialize all parameters with defaults from exercise
     int k = 4, L = 5, N = 1, seed = 1;
-    double w = 4.0, R = 2000.0;
+    double w = 4.0, R = 2.0;
 
     // hypercube / ivf specific
     int kproj = 14, M = 10, probes = 2, kclusters = 50, nprobe = 5, nbits = 8;
@@ -40,20 +40,8 @@ int main(int argc, char **argv)
             query_file = argv[++i];
         else if (a == "-o" && i + 1 < argc)
             output_file = argv[++i];
-        else if (a == "-k" && i + 1 < argc)
-            k = stoi(argv[++i]);
-        else if (a == "-L" && i + 1 < argc)
-            L = stoi(argv[++i]);
-        else if (a == "-w" && i + 1 < argc)
-            w = stod(argv[++i]);
         else if (a == "-N" && i + 1 < argc)
             N = stoi(argv[++i]);
-        else if (a == "-R" && i + 1 < argc)
-            R = stod(argv[++i]);
-        else if (a == "--seed" && i + 1 < argc)
-            seed = stoi(argv[++i]);
-        else if (a == "-type" && i + 1 < argc)
-            type = argv[++i];
         else if (a == "-lsh")
             use_lsh = true;
         else if (a == "-hypercube")
@@ -62,22 +50,6 @@ int main(int argc, char **argv)
             use_ivfflat = true;
         else if (a == "-ivfpq")
             use_ivfpq = true;
-        else if (a == "-kproj" && i + 1 < argc)
-            kproj = stoi(argv[++i]);
-        else if (a == "-M" && i + 1 < argc)
-            M = stoi(argv[++i]);
-        else if (a == "-probes" && i + 1 < argc)
-            probes = stoi(argv[++i]);
-        else if (a == "-kclusters" && i + 1 < argc)
-            kclusters = stoi(argv[++i]);
-        else if (a == "-nprobe" && i + 1 < argc)
-            nprobe = stoi(argv[++i]);
-        else if (a == "-nbits" && i + 1 < argc)
-            nbits = stoi(argv[++i]);
-        else if (a == "-range" && i + 1 < argc)
-            rangeSearch = (string(argv[++i]) == "true");
-        else if (a == "-silhouette" && i + 1 < argc)
-            find_k = (string(argv[++i]) == "true");
     }
 
     // Basic validation
@@ -141,15 +113,6 @@ int main(int argc, char **argv)
         // call ivfpq algorithm
         success = ivfpq_main(data_file, query_file, output_file, pq_params, type, rangeSearch);
         cout << (success ? "IVFPQ exited successfully\n" : "IVFPQ exited abruptly\n");
-    }
-    else if (find_k)
-    {
-
-        vector<vector<float>> data = read_fvecs(data_file);
-        data.resize(10000);
-        KMeans kmeanss;
-        kmeanss.find_optimal_k(data, 20, 50, 2);
-        return 0;
     }
     else
     {

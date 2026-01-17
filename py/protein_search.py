@@ -206,11 +206,11 @@ def main():
     )
 
     # Evaluation
-    ap.add_argument("--evalN", type=int, default=50)
+    ap.add_argument("--evalN", type=int, default=10)
     ap.add_argument("--printN", type=int, default=10)
 
     # Common ANN params
-    ap.add_argument("--N", type=int, default=50)
+    ap.add_argument("--N", type=int, default=10)
     ap.add_argument("--R", type=float, default=0.0)
     ap.add_argument("--range", action="store_true")
 
@@ -226,7 +226,7 @@ def main():
     ap.add_argument("--hc_probes", type=int, default=10)
 
     # IVF / PQ params
-    ap.add_argument("--ivf_k", type=int, default=2048)
+    ap.add_argument("--ivf_k", type=int, default=100)
     ap.add_argument("--ivf_nprobe", type=int, default=8)
     ap.add_argument("--pq_m", type=int, default=16)
     ap.add_argument("--pq_nbits", type=int, default=8)
