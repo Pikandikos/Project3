@@ -134,8 +134,6 @@ def parse_ann_text(path: str, q_ids: list[str], db_ids: list[str], topN: int):
                 if 0 <= current_qidx < len(q_ids) and 0 <= last_neighbor_idx < len(db_ids):
                     qid = norm_id(q_ids[current_qidx])
                     nid = norm_id(db_ids[last_neighbor_idx])
-                    print("DB id sample:", db_ids[:5])
-                    print("Query id sample:", q_ids[:5])
 
                     out[qid].append((nid, dist))
 
@@ -154,9 +152,13 @@ def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blas
     f.write(f"Eval N (Recall@N): {N}\n")
     f.write("========================================\n\n")
 
-    # Summary table
-    f.write("Summary (per method)\n")
-    f.write("Method\tTime/query(s)\tQPS\tRecall@N\n")
+    # =======================
+    # [1] Summary table
+    # =======================
+    f.write("[1] Summary comparison (per method)\n")
+    f.write("-" * 78 + "\n")
+    f.write(f"{'Method':<18} | {'Time/query (s)':<14} | {'QPS':<8} | {'Recall@N':<10}\n")
+    f.write("-" * 78 + "\n")
 
     for m in methods:
         t_total = timings[m]["total_sec"]
@@ -170,40 +172,68 @@ def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blas
         # stable dedup
         seen = set()
         uniq = []
-        for nid, l2 in rows:
-            if nid in seen:
-                continue
-            seen.add(nid)
-            uniq.append(nid)
+        for nid, _ in rows:
+            if nid not in seen:
+                seen.add(nid)
+                uniq.append(nid)
 
         rec = recall_n(uniq, blast_top_set, N)
-        f.write(f"{m}\t{t_per_q:.6f}\t{qps:.3f}\t{rec:.3f}\n")
 
-    f.write("\n")
+        f.write(
+            f"{m:<18} | "
+            f"{t_per_q:<14.6f} | "
+            f"{qps:<8.2f} | "
+            f"{rec:<10.3f}\n"
+        )
+
+    f.write("-" * 78 + "\n\n")
+
+    # =======================
+    # [2] Detailed neighbors
+    # =======================
+    f.write(f"[2] Top-{printN} neighbors per method (Recall@N uses N={N})\n\n")
 
     for m in methods:
-        f.write(f"Top-{printN} neighbors ({m})\n")
-        f.write("Rank\tNeighborID\tL2\tBLAST_pident\tIn_BLAST_TopN\tComment\n")
+        f.write(f"Method: {m}\n")
+        f.write("-" * 94 + "\n")
+        f.write(
+            f"{'Rank':<6} | "
+            f"{'Neighbor ID':<14} | "
+            f"{'L2 Dist':<10} | "
+            f"{'BLAST Identity':<16} | "
+            f"{'In BLAST Top-N?':<18} | "
+            f"{'Bio comment':<12}\n"
+        )
+        f.write("-" * 94 + "\n")
 
         rows = ann_results[m].get(qid, [])
 
+        # stable dedup
         seen = set()
         rows_unique = []
         for nid, l2 in rows:
-            if nid in seen:
-                continue
-            seen.add(nid)
-            rows_unique.append((nid, l2))
+            if nid not in seen:
+                seen.add(nid)
+                rows_unique.append((nid, l2))
 
         for rank, (nid, l2) in enumerate(rows_unique[:printN], start=1):
             pident = blast_pident.get(nid)
-            pident_str = f"{pident:.2f}" if pident is not None else "-"
-            if nid not in blast_top_set and nid in set(blast_pident.keys()):
-                f.write(f"# DEBUG: nid has pident but not in top set: {nid}\n")
-            in_blast = "Yes" if nid in blast_top_set else "No"
-            f.write(f"{rank}\t{nid}\t{l2:.6f}\t{pident_str}\t{in_blast}\t-\n")
+            pident_str = f"{pident:.2f}%" if pident is not None else "-"
 
-        f.write("\n")
+            in_blast = "Yes" if nid in blast_top_set else "No"
+
+            f.write(
+                f"{rank:<6} | "
+                f"{nid:<14} | "
+                f"{l2:<10.6f} | "
+                f"{pident_str:<16} | "
+                f"{in_blast:<18} | "
+                f"{'-':<12}\n"
+            )
+
+    f.write("-" * 94 + "\n\n")
+
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -368,9 +398,6 @@ def main():
             timings[m] = { "total_sec": (t1 - t0), "q_count": Q.shape[0]}
             ann_results[m] = parse_ann_text(str(out_path), q_ids, db_ids, topN=args.N)
 
-            # some_q = q_ids[0]
-            # print("Example parsed neighbors:", ann_results[methods[0]].get(some_q, [])[:3])
-            # print("Example BLAST hits:", blast_top.get(some_q, [])[:3])
     
     for qid in list(ann_results.values())[0].keys():
         print("DEBUG QID:", qid)

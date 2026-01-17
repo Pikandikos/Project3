@@ -2,3 +2,5 @@ torch
 fair-esm
 numpy
 biopython
+scikit-learn>=1.0.0
+kahip>=0.71

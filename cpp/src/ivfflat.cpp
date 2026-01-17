@@ -320,12 +320,12 @@ bool ivfflat_main(vector<vector<float>> dataset,
          << ", seed=" << seed << "\n";
 
     // FOR TESTING: Limit dataset sizes for faster debugging (optional)
-    int dataset_limit = 7500;
-    int query_limit = 2500;
-    if ((int)dataset.size() > dataset_limit)
-        dataset.resize(dataset_limit);
-    if ((int)queries.size() > query_limit)
-        queries.resize(query_limit);
+    // int dataset_limit = 7500;
+    // int query_limit = 2500;
+    // if ((int)dataset.size() > dataset_limit)
+    //     dataset.resize(dataset_limit);
+    // if ((int)queries.size() > query_limit)
+    //     queries.resize(query_limit);
 
     // Build index + run searches
     buildIVFFlat(dataset, kclusters, seed);
