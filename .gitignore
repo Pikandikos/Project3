@@ -12,3 +12,4 @@ blast_db/
 *.d
 .venv/
 settings.json
+myfolder/
