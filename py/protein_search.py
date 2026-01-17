@@ -93,29 +93,46 @@ def recall_n(ann_ids, blast_set, N):
     return len(set(ann_ids[:N]) & blast_set) / float(N)
 
 
-def parse_ann_tsv(path, q_ids, db_ids):
+def parse_ann_text(path: str, q_ids: list[str], db_ids: list[str], topN: int):
+
     out = defaultdict(list)  # qid -> [(neighbor_id, l2), ...]
 
+    current_qidx = None
+    last_neighbor_idx = None
+
     with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
+        for raw in f:
+            line = raw.strip()
+            if not line:
                 continue
 
-            parts = line.split("\t")
-            if len(parts) < 4:
+            if line.startswith("Query:"):
+                current_qidx = int(line.split(":")[1].strip())
+                last_neighbor_idx = None
                 continue
 
-            q_idx = int(parts[0])
-            n_idx = int(parts[2])
-            l2 = float(parts[3])
+            if line.startswith("Nearest neighbor"):
+                # "Nearest neighbor-3: 15886"
+                last_neighbor_idx = int(line.split(":")[1].strip())
+                continue
 
-            qid = q_ids[q_idx]
-            nid = db_ids[n_idx]
+            if line.startswith("distanceApproximate:"):
+                if current_qidx is None or last_neighbor_idx is None:
+                    continue
 
-            out[qid].append((nid, l2))
+                dist = float(line.split(":")[1].strip())
+                # map indices -> IDs
+                if 0 <= current_qidx < len(q_ids) and 0 <= last_neighbor_idx < len(db_ids):
+                    qid = q_ids[current_qidx]
+                    nid = db_ids[last_neighbor_idx]
+                    out[qid].append((nid, dist))
+
+                    # keep only topN per query (optional safety)
+                    if len(out[qid]) >= topN:
+                        last_neighbor_idx = None
 
     return out
+
 
 def write_query_block(f, qid, methods, ann_results, timings, blast_top_set, blast_pident,
     N, printN):
@@ -309,7 +326,7 @@ def main():
             #         t1 = time.perf_counter()
 
             #         timings[m] = {"total_sec": (t1 - t0), "q_count": Q.shape[0]}
-            #         ann_results[m] = parse_ann_tsv(out_path, q_ids, db_ids)
+            #         ann_results[m] = parse_ann_text(str(out_path), q_ids, db_ids, topN=args.N)
             #         continue
             else:
                 raise ValueError(f"Unknown method: {m}")
@@ -319,7 +336,12 @@ def main():
             t1 = time.perf_counter()
 
             timings[m] = { "total_sec": (t1 - t0), "q_count": Q.shape[0]}
-            ann_results[m] = parse_ann_tsv(out_path, q_ids, db_ids)
+            ann_results[m] = parse_ann_text(str(out_path), q_ids, db_ids, topN=args.N)
+
+            # some_q = q_ids[0]
+            # print("Example parsed neighbors:", ann_results[methods[0]].get(some_q, [])[:3])
+            # print("Example BLAST hits:", blast_top.get(some_q, [])[:3])
+
 
     # Write final report
     report_path = out_dir / args.report_name
