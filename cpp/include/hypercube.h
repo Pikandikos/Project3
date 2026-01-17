@@ -47,7 +47,7 @@ vector<int> queryHypercube(const vector<vector<float>> &data, const vector<float
 //   probes       - Maximum number of vertices to probe in the hypercube
 //   outputFile   - Path to the output file where results are stored
 // =====================================================================================
-void searchHypercube(const vector<vector<double>> &queries, int N, double R, bool rangeSearch,
+void searchHypercube(const vector<vector<float>> &queries, int N, double R, bool rangeSearch,
                      int M, int probes, const string &outputFile);
 
 #endif // HYPERCUBE_H

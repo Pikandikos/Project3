@@ -15,3 +15,4 @@ settings.json
 cpp/bin/search
 py/out
 py/ann
+protein_search_renew.py
