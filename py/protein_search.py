@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
+import struct
 import subprocess
 import tempfile
-import time
+import torch
+import esm
 from pathlib import Path
+from typing import List, Tuple
+import numpy as np
+import json
+import time
 from collections import defaultdict
 
 # from nlsh_build import nlsh_build
 # from nlsh_search import nlsh_search
 
-import numpy as np
-
-
-def embed_queries_esm2(fasta_path: str) -> Tuple[np.ndarray, List[str]]:
+def embed_queries_esm2(fasta_path: str) -> tuple[np.ndarray, list[str]]:
     # Load small ESM-2 model (t6, 8M params) and use last layer (6)
     model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
     model.eval()
@@ -27,13 +29,13 @@ def embed_queries_esm2(fasta_path: str) -> Tuple[np.ndarray, List[str]]:
     batch_converter = alphabet.get_batch_converter()
 
     # Collect query ids and raw sequences
-    ids: List[str] = []
-    seqs: List[str] = []
+    ids: list[str] = []
+    seqs: list[str] = []
     for rec in SeqIO.parse(fasta_path, "fasta"):
         ids.append(rec.id)
         seqs.append(str(rec.seq))
 
-    embs: List[np.ndarray] = []
+    embs: list[np.ndarray] = []
 
     # No gradients needed for inference
     with torch.no_grad():
@@ -61,7 +63,7 @@ def embed_queries_esm2(fasta_path: str) -> Tuple[np.ndarray, List[str]]:
     return Q, ids
 
 #Load Dbs
-def load_ids(ids_path: str) -> List[str]:
+def load_ids(ids_path: str) -> list[str]:
     # Load one ID per line (strip empty lines)
     with open(ids_path, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
@@ -91,6 +93,11 @@ def write_fvecs(path, X):
         for i in range(n):
             f.write(struct.pack("<i", d))
             f.write(X[i].tobytes(order="C"))
+
+
+# Run C++ files/algorithms
+def run_cmd(cmd: List[str]) -> None:
+    subprocess.run(cmd, check=True)
 
 
 def load_json(path):
